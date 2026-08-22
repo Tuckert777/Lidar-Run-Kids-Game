@@ -63,6 +63,10 @@
   }
   #home:active{transform:none;}
   #home.on{display:block;}
+  .buildStamp{
+    margin-top:20px;font:400 10px/1 ui-monospace,"Courier New",monospace;
+    letter-spacing:.14em;color:rgba(255,255,255,.35);
+  }
   #mute{
     position:absolute;z-index:5;margin:0;
     top:calc(10px + env(safe-area-inset-top));right:calc(10px + env(safe-area-inset-right));
@@ -84,6 +88,7 @@
     <div class="lasers" id="laserA"></div>
     <div class="laserName" id="laserNameA"></div>
     <button id="go">Fly!</button>
+    <div class="buildStamp" id="buildStamp"></div>
   </div>
 </div>
 
@@ -162,6 +167,14 @@ function resize(){
     var cs = window.getComputedStyle(pb);
     SAFE_T = (parseFloat(cs.paddingTop)    || 0) / scale;
     SAFE_B = (parseFloat(cs.paddingBottom) || 0) / scale;
+  }
+  // iOS standalone sometimes reports 0 for env(); never let the HUD hide under the status bar
+  var standalone = (window.navigator && window.navigator.standalone === true) ||
+                   (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+                   (window.matchMedia && window.matchMedia("(display-mode: fullscreen)").matches);
+  if(standalone){
+    if(SAFE_T < 40/scale) SAFE_T = 46/scale;
+    if(SAFE_B < 10/scale) SAFE_B = 18/scale;
   }
   if(D) D.y=Math.max(SKY+DH,Math.min(GRD-DH,D.y));
 }
@@ -693,6 +706,9 @@ function frame(ts){
 }
 document.addEventListener("visibilitychange",function(){ if(document.hidden){ last=0; held=false; } });
 
+var BUILD="b4-2052";
+try{ document.getElementById("buildStamp").textContent="build "+BUILD; }catch(e){}
+console.log("LiDAR build",BUILD);
 layout(); reset(); resize(); buildLasers();
 requestAnimationFrame(frame);
 })();
