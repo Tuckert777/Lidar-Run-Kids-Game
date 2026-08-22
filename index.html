@@ -73,6 +73,7 @@
 </style>
 </head>
 <body>
+<div id="safeProbe" style="position:fixed;top:0;left:0;width:0;height:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);"></div>
 <div id="wrap">
   <canvas id="c"></canvas>
   <button id="mute" aria-label="Sound">&#9835;</button>
@@ -147,7 +148,7 @@ function tintSkin(){
 
 /* ---------- canvas ---------- */
 var cv=document.getElementById("c"),ctx=cv.getContext("2d");
-var scale=1,offX=0,offY=0;
+var scale=1,offX=0,offY=0,SAFE_T=0,SAFE_B=0;
 function resize(){
   layout();
   var dpr=Math.min(window.devicePixelRatio||1,2);
@@ -156,6 +157,12 @@ function resize(){
   scale=Math.max(w/VW,h/VH);
   offX=(w-VW*scale)/2; offY=(h-VH*scale)/2;
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  var pb = document.getElementById("safeProbe");
+  if(pb){
+    var cs = window.getComputedStyle(pb);
+    SAFE_T = (parseFloat(cs.paddingTop)    || 0) / scale;
+    SAFE_B = (parseFloat(cs.paddingBottom) || 0) / scale;
+  }
   if(D) D.y=Math.max(SKY+DH,Math.min(GRD-DH,D.y));
 }
 window.addEventListener("resize",resize);
@@ -613,13 +620,13 @@ function drawCeiling(){
   ctx.setLineDash([]);
   ctx.fillStyle = ceilWarn>0 ? "#FF7A45" : "rgba(255,255,255,.85)";
   ctx.font = "700 12px ui-rounded,-apple-system,sans-serif";
-  ctx.fillText("400 ft ceiling", 16, SKY-9);
+  ctx.fillText("400 ft ceiling", 16, Math.max(SKY-9, SAFE_T+14));
   ctx.restore();
 }
 
 function drawHUD(){
   var pad=16, bw=BIG?128:150, bh=BIG?50:56;
-  var py=VH-bh-18;   // bottom left, clear of the home button
+  var py=VH-bh-18-SAFE_B;   // bottom left, clear of the home button
   ctx.fillStyle="rgba(255,255,255,.75)";
   rr(pad,py,bw,bh,bh/2); ctx.fill();
   // little star icon
