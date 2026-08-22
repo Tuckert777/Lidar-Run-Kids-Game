@@ -85,6 +85,7 @@
   <div id="title">
     <h1>Drone<em>Flight</em></h1>
     <p class="sub"><b>Hold</b> the screen to fly up.<br><b>Let go</b> to come down.<br>Collect the stars!</p>
+    <div class="laserName" id="bestLine"></div>
     <div class="lasers" id="laserA"></div>
     <div class="laserName" id="laserNameA"></div>
     <button id="go">Fly!</button>
@@ -139,6 +140,19 @@ function LRGBA(a){
   return "rgba("+c[0]+","+c[1]+","+c[2]+","+a+")";
 }
 /* the whole airframe wears the beam colour */
+var STORE = "droneFlight.v1";
+function saveState(){
+  try{ localStorage.setItem(STORE, JSON.stringify({laser:laser, bestScore:bestScore})); }catch(e){}
+}
+function loadState(){
+  try{
+    var o = JSON.parse(localStorage.getItem(STORE) || "{}");
+    if(typeof o.laser === "number" && LASERS[o.laser]) laser = o.laser;
+    if(typeof o.bestScore === "number" && isFinite(o.bestScore) && o.bestScore >= 0) bestScore = o.bestScore;
+  }catch(e){}
+}
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
+
 function tintSkin(){
   var c = LASERS[laser].rgb;
   function s(f){
@@ -227,7 +241,7 @@ function groundY(wx){
   return GRD - 10*TS - Math.sin(wx*0.0035*FQ)*9*TS - Math.sin(wx*0.0091*FQ+1.2)*5*TS;
 }
 
-var D=null,playing=false,world=0,t=0,held=false,ceilWarn=0;
+var D=null,playing=false,world=0,t=0,held=false,ceilWarn=0,bestScore=0;
 var stars,trees,clouds,planes,sparkles,pops,score,cheer,cheerT,nextStar,nextTree,nextCloud,nextPlane;
 
 function reset(){
@@ -268,6 +282,10 @@ function start(){
   beep(660,0.09,"triangle",0.06);
   setTimeout(function(){beep(880,0.12,"triangle",0.06);},90);
 }
+function showBest(){
+  var b=document.getElementById("bestLine");
+  if(b) b.textContent = bestScore>0 ? "Most stars: "+bestScore : "";
+}
 function buildLasers(){
   var row=document.getElementById("laserA");
   if(!row) return;
@@ -281,6 +299,7 @@ function buildLasers(){
     row.appendChild(b);
   });
   document.getElementById("laserNameA").textContent=LASERS[laser].n+" drone";
+  saveState(); showBest();
 }
 document.getElementById("go").addEventListener("click",start);
 
@@ -365,6 +384,7 @@ function update(dt){
       pop(s.x,s.y,C.star,10);
       beep(700+(score%6)*90,0.09,"triangle",0.05);
       stars.splice(i,1);
+      if(score>bestScore){ bestScore=score; saveState(); }
       if(score%10===0){
         cheer=CHEERS[(Math.random()*CHEERS.length)|0]; cheerT=1.8;
         beep(880,0.09,"triangle",0.06);
@@ -706,7 +726,8 @@ function frame(ts){
 }
 document.addEventListener("visibilitychange",function(){ if(document.hidden){ last=0; held=false; } });
 
-var BUILD="b4-2052";
+loadState();
+var BUILD="b6-2156";
 try{ document.getElementById("buildStamp").textContent="build "+BUILD; }catch(e){}
 console.log("LiDAR build",BUILD);
 layout(); reset(); resize(); buildLasers();
