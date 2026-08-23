@@ -21,13 +21,13 @@
   #wrap{position:fixed;inset:0;}
   canvas{display:block;width:100%;height:100%;}
 
-  #title{
+  #title,#over{
     position:absolute;inset:0;display:flex;flex-direction:column;
     align-items:center;justify-content:center;text-align:center;
     padding:24px calc(22px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(22px + env(safe-area-inset-left));
     background:rgba(20,60,90,.55);backdrop-filter:blur(3px);color:#fff;
   }
-  #title.off{display:none;}
+  #title.off,#over.off{display:none;}
   h1{
     margin:0;font-size:clamp(40px,13vw,74px);line-height:.92;font-weight:900;
     letter-spacing:-.03em;text-shadow:0 4px 0 rgba(0,0,0,.18);
@@ -54,6 +54,10 @@
   }
   .lchip:active{transform:none;box-shadow:none;}
   .lchip.on{border-color:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.35);}
+  button.small{
+    margin-top:14px;background:rgba(255,255,255,.18);color:#EAF7FF;
+    font-size:16px;padding:13px 26px;box-shadow:0 4px 0 rgba(0,0,0,.18);
+  }
   .laserName{margin-top:10px;font-size:15px;font-weight:700;color:#EAF7FF;}
   #home{
     position:absolute;z-index:5;margin:0;display:none;
@@ -82,6 +86,14 @@
   <canvas id="c"></canvas>
   <button id="mute" aria-label="Sound">&#9835;</button>
   <button id="home" aria-label="Back to start">&#8962;</button>
+  <div id="over" class="off">
+    <h1>Nice<em>flying!</em></h1>
+    <p class="sub">You collected <b id="fStars">0</b> stars.</p>
+    <div class="laserName" id="fBest"></div>
+    <button id="again">Fly again!</button>
+    <button id="backHome" class="small">Back to start</button>
+  </div>
+
   <div id="title">
     <h1>Drone<em>Flight</em></h1>
     <p class="sub"><b>Hold</b> the screen to fly up.<br><b>Let go</b> to come down.<br>Collect the stars!</p>
@@ -241,13 +253,13 @@ function groundY(wx){
   return GRD - 10*TS - Math.sin(wx*0.0035*FQ)*9*TS - Math.sin(wx*0.0091*FQ+1.2)*5*TS;
 }
 
-var D=null,playing=false,world=0,t=0,held=false,ceilWarn=0,bestScore=0;
+var D=null,playing=false,world=0,t=0,held=false,ceilWarn=0,bestScore=0,starT=0;
 var stars,trees,clouds,planes,sparkles,pops,score,cheer,cheerT,nextStar,nextTree,nextCloud,nextPlane;
 
 function reset(){
   D={y:SKY+PLAY*0.45,vy:0,thr:0,rot:0};
   stars=[];trees=[];clouds=[];planes=[];sparkles=[];pops=[];
-  world=0;t=0;score=0;held=false;cheer="";cheerT=0;ceilWarn=0;
+  world=0;t=0;score=0;held=false;cheer="";cheerT=0;ceilWarn=0;starT=0;
   nextStar=VW*0.55; nextTree=VW*0.30; nextCloud=VW*0.20; nextPlane=VW*1.6;
 }
 
@@ -266,17 +278,34 @@ window.addEventListener("keyup",function(e){
 });
 
 var elTitle=document.getElementById("title");
+var elOver=document.getElementById("over");
+function endGame(){
+  playing=false; held=false;
+  if(hum){ try{ hum.o.stop(); }catch(err){} hum=null; }
+  if(score>bestScore){ bestScore=score; saveState(); }
+  document.getElementById("home").classList.remove("on");
+  document.getElementById("fStars").textContent=score;
+  document.getElementById("fBest").textContent = bestScore>0 ? "Most ever: "+bestScore : "";
+  beep(560,0.16,"triangle",0.06);
+  setTimeout(function(){ beep(420,0.24,"triangle",0.06); },150);
+  elOver.classList.remove("off");
+}
+document.getElementById("again").addEventListener("click",function(e){ e.stopPropagation(); elOver.classList.add("off"); start(); });
+document.getElementById("backHome").addEventListener("click",function(e){ e.stopPropagation(); elOver.classList.add("off"); goHome(); });
+
 function goHome(){
   playing=false; held=false;
   if(hum){ try{ hum.o.stop(); }catch(err){} hum=null; }
   reset();
   document.getElementById("home").classList.remove("on");
   elTitle.classList.remove("off");
+  elOver.classList.add("off");
 }
 document.getElementById("home").addEventListener("click",function(e){ e.stopPropagation(); goHome(); });
 
 function start(){
   reset(); playing=true; humOn();
+  elOver.classList.add("off");
   document.getElementById("home").classList.add("on");
   elTitle.classList.add("off");
   beep(660,0.09,"triangle",0.06);
@@ -340,6 +369,9 @@ function update(dt){
   if(ceilWarn>0) ceilWarn-=dt;
   if(!playing) return;
 
+  starT+=dt;
+  if(starT>=30){ endGame(); return; }
+
   world+=SPD*dt;
 
   // gentle flight: hold rises, release sinks, nothing else happens
@@ -377,10 +409,10 @@ function update(dt){
     var s=stars[i];
     s.x-=SPD*dt;
     var dx=(DX+DW/2)-s.x, dy=D.y-s.y, d=Math.sqrt(dx*dx+dy*dy);
-    if(d<PLAY*0.13){ s.x+=dx/d*260*dt; s.y+=dy/d*260*dt; }
+    if(d<PLAY*0.07){ s.x+=dx/d*260*dt; s.y+=dy/d*260*dt; }   // helps little hands without auto-playing
     if(s.x<-40){ stars.splice(i,1); continue; }
     if(d<DW*0.75){
-      score++;
+      score++; starT=0;
       pop(s.x,s.y,C.star,10);
       beep(700+(score%6)*90,0.09,"triangle",0.05);
       stars.splice(i,1);
@@ -677,6 +709,19 @@ function drawHUD(){
   ctx.font="900 "+(BIG?27:31)+"px ui-rounded,-apple-system,sans-serif";
   ctx.fillText(String(score), pad+bh*0.95, py+bh/2+(BIG?10:11));
 
+  if(playing && starT>20){
+    var left=Math.ceil(30-starT);
+    var msg="Find a star! "+left;
+    ctx.font="900 "+(BIG?22:26)+"px ui-rounded,-apple-system,sans-serif";
+    var w=ctx.measureText(msg).width;
+    ctx.globalAlpha=0.55+Math.sin(t*7)*0.35;
+    ctx.lineWidth=7; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineJoin="round";
+    ctx.strokeText(msg,VW/2-w/2,SAFE_T+SKY+46);
+    ctx.fillStyle="#FF7A45";
+    ctx.fillText(msg,VW/2-w/2,SAFE_T+SKY+46);
+    ctx.globalAlpha=1;
+  }
+
   if(cheerT>0){
     ctx.globalAlpha=Math.min(1,cheerT*1.6);
     ctx.font="900 "+(BIG?30:36)+"px ui-rounded,-apple-system,sans-serif";
@@ -727,7 +772,7 @@ function frame(ts){
 document.addEventListener("visibilitychange",function(){ if(document.hidden){ last=0; held=false; } });
 
 loadState();
-var BUILD="b6-2156";
+var BUILD="b7-1538";
 try{ document.getElementById("buildStamp").textContent="build "+BUILD; }catch(e){}
 console.log("LiDAR build",BUILD);
 layout(); reset(); resize(); buildLasers();
